@@ -1,9 +1,20 @@
 from tkinter import Tk, Canvas, PhotoImage, mainloop
+import random
+import datetime
+import threading
 import sys
 import json
 
+usage = """
+Usage: python json-viewer.py <path> [thread_count]
+
+Arguments:
+    path            Path to the jsong-g file
+    thread_count    Amount of threads to use during rendering
+"""
+
 if len(sys.argv) < 2:
-    print("No path given.")
+    print(usage)
     sys.exit(1)
 
 with open(sys.argv[1]) as f:
@@ -13,6 +24,9 @@ with open(sys.argv[1]) as f:
         print("Invalid JSON-G!")
         print(" ".join(e.args))
         sys.exit(1)
+
+if len(sys.argv) > 3:
+	thread_count = sys.argv[2]
     
 class Color:
     def __init__(self, value):
@@ -70,6 +84,12 @@ class Color:
         value = ((int(r) << 16) + (int(g) << 8) + int(b))
         return cls(value)
 
+class Window(Tk):
+    def __init__(self):
+        super().__init__()
+        self.withdraw()
+        self.after(0,self.deiconify)
+
 WIDTH = data["size"]["width"]
 HEIGHT = data["size"]["height"]
 bg_data = data["layers"][0]["default_color"]
@@ -77,24 +97,43 @@ bg = Color.from_rgb(bg_data["red"],bg_data["green"],bg_data["blue"])
 
 layers = data["layers"]
 
-window = Tk()
+window = Window()
 window.wm_title("JSON-G Viewer")
 canvas = Canvas(window, width=WIDTH, height=HEIGHT, bg=str(bg))
 canvas.pack()
-img = PhotoImage(width=WIDTH, height=HEIGHT, format="RGBA")
+img = PhotoImage(width=WIDTH, height=HEIGHT)
 canvas.create_image((WIDTH/2, HEIGHT/2), image=img, state="normal")
 
-for layer in layers:
-    for pixel in layer["pixels"]:
+def load_pixels(img, data, pixels):
+    for pixel in pixels:
         pos = pixel["position"]
         clr = pixel["color"]
         color = Color.from_rgb(clr["red"],clr["green"],clr["blue"])
-        color.add_alpha(clr["alpha"])
-        if clr["alpha"] != 255:
+        if data["transparency"] is True and clr["alpha"] != 255:
+            color.add_alpha(clr["alpha"])
             other = Color.from_rgb(*img.get(pos["x"]+1, pos["y"]+1))
             new = color.blend(other)
         else:
             new = color
         img.put(str(new), (pos["x"]+1, pos["y"]+1))
 
-mainloop()
+def load_image(img, data, thread_count):
+    for layer in layers:
+        pixel_count = len(layer["pixels"])
+        num_per_thread = round(pixel_count/thread_count)
+        for i in range(thread_count):
+            t = threading.Thread(target=load_pixels, args=(img, data, layer["pixels"][i*num_per_thread:(i+1)*num_per_thread]))
+            t.start()
+
+# The amount of threads you want to use. 
+# I have experienced it to perform best at around 4 or 5, 
+# but this may vary depending on the hardware you have.
+try:
+	# Check if it was defined in sys.argv
+	thread_count
+except:
+	thread_count = 1
+
+t = threading.Thread(target=load_image, args=(img, data, thread_count))
+t.start()
+window.mainloop()
