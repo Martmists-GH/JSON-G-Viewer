@@ -24,13 +24,9 @@ with open(argv[1]) as f:
         print(" ".join(e.args))
         exit(1)
 
-if len(argv) >= 3:
-    try:
-        thread_count = int(argv[2])
-    except:
-        print("thread_count has to be an integer!")
-        exit(1)
-
+if len(argv) > 3:
+	thread_count = argv[2]
+    
 class Color:
     def __init__(self, value):
         if not value:
@@ -83,6 +79,7 @@ class Color:
 
     @classmethod
     def from_rgb(cls, r, g, b):
+        """ (0,0,0) to (255,255,255) """
         value = ((int(r) << 16) + (int(g) << 8) + int(b))
         return cls(value)
 
@@ -90,7 +87,6 @@ class Window(Tk):
     def __init__(self):
         super().__init__()
         self.withdraw()
-        self.wm_title("JSON-G Viewer")
         self.deiconify()
 
 WIDTH = data["size"]["width"]
@@ -101,59 +97,42 @@ bg = Color.from_rgb(bg_data["red"],bg_data["green"],bg_data["blue"])
 layers = data["layers"]
 
 window = Window()
+window.wm_title("JSON-G Viewer")
 canvas = Canvas(window, width=WIDTH, height=HEIGHT, bg=str(bg))
 canvas.pack()
 img = PhotoImage(width=WIDTH, height=HEIGHT)
 canvas.create_image((WIDTH/2, HEIGHT/2), image=img, state="normal")
 
-def sort_pixels(pixels):
-    return sorted(pixels, key=lambda p: (p["position"]['x'], p["position"]['y']))
-
-def get_pixel_locations(pixels):
-    return [
-        (
-            pixel["position"]["x"],
-            pixel["position"]["y"]
-        ) 
-        for pixel in pixels
-    ]
-
-def generate_slice(img, data, layer, pixels, locs, cols):
-    for col in cols:
-        col_px = [
-            (
-                str(Color.from_rgb(px["color"]["red"],px["color"]["green"],px["color"]["blue"])),
-                px["position"]["y"]
-            ) 
-            for px in pixels 
-            if px["position"]["x"] == col
-        ]
-        for px in range(data["size"]["height"]):
-            if col not in [l[0] for l in locs if l[1]==px] or px not in [l[1] for l in locs if l[0]==col]:
-                col_px.append((str(Color.from_rgb(layer["default_color"]["red"],layer["default_color"]["green"],layer["default_color"]["blue"])), px))
-        col_px = sorted(col_px, key=lambda t: t[1])
-        img.put([c[0] for c in col_px], (col+1,1))
+def load_pixels(img, data, pixels):
+    for pixel in pixels:
+        pos = pixel["position"]
+        clr = pixel["color"]
+        color = Color.from_rgb(clr["red"],clr["green"],clr["blue"])
+        if data["transparency"] is True and clr["alpha"] != 255:
+            color.add_alpha(clr["alpha"])
+            other = Color.from_rgb(*img.get(pos["x"]+1, pos["y"]+1))
+            new = color.blend(other)
+        else:
+            new = color
+        img.put(str(new), (pos["x"]+1, pos["y"]+1))
 
 def load_image(img, data, thread_count):
-    for layer in data["layers"]:
-        pixels = sort_pixels(layer["pixels"])
-        locs = get_pixel_locations(pixels)
-        num_per_thread = round(data["size"]["width"]/thread_count)
+    for layer in layers:
+        pixel_count = len(layer["pixels"])
+        num_per_thread = round(pixel_count/thread_count)
         for i in range(thread_count):
-            cols = range(i*num_per_thread,(i+1)*num_per_thread)
-            t = Thread(target=generate_slice, args=(img, data, layer, pixels, locs, cols))
+            t = Thread(target=load_pixels, args=(img, data, layer["pixels"][i*num_per_thread:(i+1)*num_per_thread]))
             t.start()
 
 # The amount of threads you want to use. 
 # I have experienced it to perform best at around 4 or 5, 
 # but this may vary depending on the hardware you have.
 try:
-    # Check if it was defined in sys.argv
-    thread_count
+	# Check if it was defined in sys.argv
+	thread_count
 except:
-    thread_count = 1
+	thread_count = 1
 
 t = Thread(target=load_image, args=(img, data, thread_count))
 t.start()
-
 window.mainloop()
