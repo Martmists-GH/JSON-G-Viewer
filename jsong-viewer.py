@@ -10,6 +10,7 @@ Usage: python json-viewer.py <path> [thread_count]
 Arguments:
     path            Path to the jsong-g file
     thread_count    Amount of threads to use during rendering
+                    Default: 4
 """
 
 if len(argv) < 2:
@@ -131,7 +132,7 @@ try:
 	# Check if it was defined in sys.argv
 	thread_count
 except:
-	thread_count = 1
+	thread_count = 4
 
 t = Thread(target=load_image, args=(img, data, thread_count))
 t.start()
