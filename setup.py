@@ -13,6 +13,7 @@ Requirements:
 import sys, os
 from cx_Freeze import setup, Executable
 
+# Set this to python's install dir
 pypath = r"D:\Program_Files\python_3.6"
 
 os.environ['TCL_LIBRARY'] = pypath+r'\tcl\tcl8.6'
