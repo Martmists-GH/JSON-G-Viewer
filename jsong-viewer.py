@@ -25,8 +25,8 @@ with open(argv[1]) as f:
         print(" ".join(e.args))
         exit(1)
 
-if len(argv) > 3:
-	thread_count = argv[2]
+if len(argv) > 2:
+	thread_count = int(argv[2])
     
 class Color:
     def __init__(self, value):
