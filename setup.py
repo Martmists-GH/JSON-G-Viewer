@@ -14,20 +14,25 @@ import sys, os
 from cx_Freeze import setup, Executable
 
 # Set this to python's install dir
-pypath = r"D:\Program_Files\python_3.6"
+pypath = ".".join(sys.executable.split(".")[:-1])
 
-os.environ['TCL_LIBRARY'] = pypath+r'\tcl\tcl8.6'
-os.environ['TK_LIBRARY'] = pypath+r'\tcl\tk8.6'
+if sys.platform == "win32":
+    os.environ['TCL_LIBRARY'] = pypath+r'\tcl\tcl8.6'
+    os.environ['TK_LIBRARY'] = pypath+r'\tcl\tk8.6'
 
-dlls = [
-	pypath+r"\DLLs\tcl86t.dll",
-	pypath+r"\DLLs\tk86t.dll"
-]
+    dlls = [
+        pypath+r"\DLLs\tcl86t.dll",
+        pypath+r"\DLLs\tk86t.dll"
+    ]
 
-base = "Win32GUI"
+    base = "Win32GUI"
 
-setup(  name = "JSON-G Viewer",
-		version = "1.0",
-		options = {"build_exe": {"include_files": dlls}},
-		description = "View JSON-G files without converting!",
-		executables = [Executable("jsong-viewer.py", base=base)])
+else:
+    dlls = []
+    base = None
+
+setup(name="JSON-G Viewer",
+      version="1.1",
+      options={"build_exe": {"include_files": dlls}},
+      description="View JSON-G files without converting!",
+      executables=[Executable("jsong-viewer.py", base=base)])
